@@ -21,14 +21,19 @@ impl TouchDesignSystem {
     pub fn apply_to_style(&self, style: &mut Style) {
         // Apply colors
         style.visuals = self.colors.to_visuals();
-        
+
         // Apply spacing
         style.spacing.item_spacing = self.spacing.item_spacing;
         style.spacing.window_margin = self.spacing.window_margin;
         style.spacing.button_padding = self.spacing.button_padding;
-        
+
         // Apply text styles
         style.text_styles = self.typography.to_text_styles();
+    }
+
+    pub fn apply_responsive_fonts(&self, style: &mut Style, font_scale: f32) {
+        // Apply scaled text styles based on screen size
+        style.text_styles = self.typography.to_responsive_text_styles(font_scale);
     }
 }
 
@@ -123,13 +128,29 @@ impl Default for AppTypography {
 impl AppTypography {
     pub fn to_text_styles(&self) -> std::collections::BTreeMap<egui::TextStyle, FontId> {
         use egui::TextStyle::*;
-        
+
         [
             (Heading, self.heading.clone()),
             (Body, self.body.clone()),
             (Monospace, self.body.clone()),
             (Button, self.button.clone()),
             (Small, self.small.clone()),
+        ].into()
+    }
+
+    pub fn to_responsive_text_styles(&self, scale: f32) -> std::collections::BTreeMap<egui::TextStyle, FontId> {
+        use egui::TextStyle::*;
+
+        let scale_font = |font_id: &FontId| -> FontId {
+            FontId::proportional(font_id.size * scale)
+        };
+
+        [
+            (Heading, scale_font(&self.heading)),
+            (Body, scale_font(&self.body)),
+            (Monospace, scale_font(&self.body)),
+            (Button, scale_font(&self.button)),
+            (Small, scale_font(&self.small)),
         ].into()
     }
 }

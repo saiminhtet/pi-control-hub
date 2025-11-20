@@ -107,7 +107,64 @@ This file contains important context, decisions, and change history for the PiCo
 
 ## 🎨 Feature Additions
 
-### 1. Scrollable Navigation Panel (Session 1)
+### 1. Responsive Multi-Screen Support (Session 2)
+
+**User Request:** Implement responsive UI for multiple screen sizes (Pi touchscreen, Windows, macOS)
+
+**Implementation:**
+
+**New File: `src/app/responsive.rs`**
+- `ScreenSize` enum with 5 breakpoints (Tiny to XLarge)
+- `LayoutConfig` struct with screen-specific layout parameters
+- `ResponsiveState` managing current screen size and layout
+- Automatic breakpoint detection from window width
+- Layout configuration caching per screen size
+
+**Modified: `src/app/mod.rs`**
+- Added `ResponsiveState` to app struct
+- Implemented dual layout system:
+  - `mobile_layout()` - Bottom navigation for Tiny/Small screens
+  - `desktop_layout()` - Side navigation for Medium+ screens
+- `bottom_navigation()` - Horizontal scrollable icon navigation
+- `side_navigation()` - Vertical scrollable text navigation
+- `apply_responsive_styles()` - Dynamic styling based on breakpoint
+- Module icon mapping for compact mobile view
+
+**Modified: `src/main.rs`**
+- Changed window from fixed to resizable
+- Added minimum window size (320x240)
+- Removed fixed size constraint
+
+**Modified: `src/app/touch_design.rs`**
+- Added `apply_responsive_fonts()` method
+- `to_responsive_text_styles()` for font scaling
+- Font scaling based on screen size (1.5x tiny → 0.9x xlarge)
+
+**Files Modified:**
+- `src/app/responsive.rs` (new)
+- `src/app/mod.rs:1-330`
+- `src/main.rs:11-20`
+- `src/app/touch_design.rs:34-37, 141-156`
+
+**Benefits:**
+- Seamless experience across all screen sizes
+- Optimal layout for each device category
+- Touch-optimized on small screens
+- Desktop-optimized on larger displays
+- Automatic adaptation on window resize
+- Font scaling for readability at all sizes
+
+**Layout Specifications:**
+
+| Screen Size | Width Range | Nav Type | Font Scale | Touch Size | Header Height |
+|------------|-------------|----------|------------|------------|---------------|
+| Tiny       | < 480px     | Bottom   | 1.5x       | 44px       | 40px          |
+| Small      | 480-768px   | Bottom   | 1.2x       | 40px       | 48px          |
+| Medium     | 768-1024px  | Side     | 1.0x       | 36px       | 50px          |
+| Large      | 1024-1440px | Side     | 0.95x      | 32px       | 52px          |
+| XLarge     | > 1440px    | Side     | 0.9x       | 32px       | 56px          |
+
+### 2. Scrollable Navigation Panel (Session 1)
 
 **User Request:** Enable scrollable navigation panel for multiple module components
 
@@ -118,7 +175,7 @@ This file contains important context, decisions, and change history for the PiCo
   - `AlwaysVisible` scroll bar - Visual feedback
   - `auto_shrink([false; 2])` - Prevents layout issues
 
-**Files Modified:** `src/app/mod.rs:69-104`
+**Files Modified:** `src/app/mod.rs:69-104` (now superseded by responsive layouts)
 
 **Benefits:**
 - Handles unlimited module count
@@ -126,7 +183,7 @@ This file contains important context, decisions, and change history for the PiCo
 - Visual scroll indicator always visible
 - Maintains 44px minimum touch targets
 
-### 2. Comprehensive Documentation
+### 3. Comprehensive Documentation
 
 **Created Files:**
 1. **README.md** - Full project documentation including:
@@ -156,18 +213,26 @@ This file contains important context, decisions, and change history for the PiCo
    - Module state stored in HashMap for dynamic loading
 
 3. **Performance Considerations**
-   - Fixed 480x320 resolution (no dynamic scaling overhead)
+   - Responsive layouts with minimal overhead
    - VSync enabled for smooth rendering
    - System info updates throttled to once per second (frame_count % 60)
-   - Non-resizable window for consistent performance
+   - Resizable window with efficient layout recalculation
+
+4. **Responsive Design Strategy**
+   - **Breakpoints:** Tiny (<480px), Small (480-768px), Medium (768-1024px), Large (1024-1440px), XLarge (>1440px)
+   - **Mobile Layout** (Tiny/Small): Bottom navigation with icons, maximized content area
+   - **Desktop Layout** (Medium+): Side navigation with text labels, traditional desktop UX
+   - **Adaptive Sizing:** Font scale, margins, touch targets, and button sizes adjust per breakpoint
+   - **Real-time Adaptation:** Layout updates automatically on window resize
 
 ### File Structure
 ```
 src/
-├── main.rs                  # Entry point, window configuration
+├── main.rs                  # Entry point, window configuration (resizable)
 ├── app/
-│   ├── mod.rs              # Main application logic, UI orchestration
-│   └── touch_design.rs     # Design system (colors, spacing, typography)
+│   ├── mod.rs              # Main application logic, responsive UI orchestration
+│   ├── touch_design.rs     # Design system (colors, spacing, typography)
+│   └── responsive.rs       # Responsive breakpoints and layout configs
 ├── modules/
 │   ├── mod.rs              # Module trait and type definitions
 │   ├── system_monitor.rs   # CPU, memory, temperature monitoring
@@ -205,27 +270,32 @@ anyhow = "1.0"         # Error handling
 
 ### Design System Colors
 ```rust
+// UI Colors
 Primary:    #3B82F6  // Blue-500 (active states)
 Secondary:  #64748B  // Slate-500 (unused currently)
-Success:    #22C55E  // Green-500 (< 60% usage)
-Warning:    #EAB308  // Yellow-500 (60-80% usage)
-Error:      #EF4444  // Red-500 (> 80% usage)
 Background: #0F172A  // Slate-900 (main bg)
 Surface:    #1E293B  // Slate-800 (panels, inactive buttons)
+
+// Status Colors (Progress Bars) - Darker shades for better text contrast
+Success:    #16A34A  // Green-600 (< 60% usage)
+Warning:    #CA8A04  // Yellow-600 (60-80% usage) - improved contrast
+Error:      #DC2626  // Red-600 (> 80% usage)
 ```
 
 ### Performance Thresholds
 ```rust
 // CPU/Memory usage colors
-Normal (Green):   < 60%
-Warning (Yellow): 60-80%
-Critical (Red):   > 80%
+Normal (Green-600):   < 60%  - #16A34A
+Warning (Yellow-600): 60-80% - #CA8A04 (darker for better contrast)
+Critical (Red-600):   > 80%  - #DC2626
 
 // Temperature colors
-Normal (Green):   < 60°C
-Warning (Yellow): 60-70°C
-Critical (Red):   > 70°C
+Normal (Green-600):   < 60°C - #16A34A
+Warning (Yellow-600): 60-70°C - #CA8A04
+Critical (Red-600):   > 70°C - #DC2626
 ```
+
+**Note:** Status colors use 600-level shades (darker) instead of 500-level to ensure proper contrast with white text on progress bars and labels.
 
 ## 🐛 Known Issues & Warnings
 
@@ -280,7 +350,33 @@ Critical (Red):   > 70°C
 
 ## 🔄 Version History
 
-### v0.1.0 (Current)
+### v0.2.1 (Current)
+- **Contrast Improvements**
+  - Fixed poor contrast on yellow progress bars (memory usage)
+  - Changed status colors from 500-level to 600-level shades
+  - Yellow warning color: #EAB308 → #CA8A04 (darker, better contrast)
+  - Green success color: #22C55E → #16A34A (darker, better contrast)
+  - Red error color: #EF4444 → #DC2626 (darker, better contrast)
+  - Improved readability of white text on all status indicators
+
+### v0.2.0
+- **Responsive Design System Implementation**
+  - Added multi-screen support (Tiny/Small/Medium/Large/XLarge breakpoints)
+  - Mobile-first layout with bottom navigation for screens < 768px
+  - Desktop layout with side navigation for screens >= 768px
+  - Responsive font scaling based on screen size
+  - Dynamic layout adaptation on window resize
+  - Resizable window with minimum size constraints
+- **Enhanced Navigation**
+  - Bottom navigation bar for mobile/Pi screens (icon-based)
+  - Side navigation panel for desktop screens (text-based)
+  - Scrollable navigation areas for both layouts
+- **Adaptive Styling**
+  - Responsive margins and spacing
+  - Font scaling (1.5x for Tiny, down to 0.9x for XLarge)
+  - Touch target sizes adapt to screen size
+
+### v0.1.0
 - Initial project setup
 - Fixed all egui v0.24 compatibility issues
 - Implemented touch-optimized design system
@@ -339,9 +435,38 @@ If implementing new features, consider asking:
 4. **Touch UIs need different metrics** - Desktop UI guidelines don't apply to touchscreens
 5. **Module system is powerful** - Trait objects enable flexible plugin architecture
 
+## 🎯 Responsive Design Implementation Notes
+
+### Breakpoint Selection Rationale
+- **Tiny (< 480px):** Raspberry Pi 3.5" touchscreen (480x320) and similar embedded displays
+- **Small (480-768px):** Tablets and larger embedded displays
+- **Medium (768-1024px):** Small laptops and desktop windows
+- **Large (1024-1440px):** Standard desktop displays
+- **XLarge (> 1440px):** Large monitors and ultra-wide displays
+
+### Layout Switching Logic
+The app automatically detects screen size on every frame update and switches between:
+1. **Mobile Mode** (Tiny/Small): Icon-based bottom navigation, no side panel, maximized content
+2. **Desktop Mode** (Medium+): Text-based side navigation, traditional desktop layout
+
+### Testing Responsive Layouts
+To test different layouts:
+1. **Pi Screen:** Run normally on Raspberry Pi (480x320 → Tiny)
+2. **Tablet Mode:** Resize window to 600px wide (Small)
+3. **Desktop Mode:** Resize window to 1024px+ (Medium/Large)
+4. **Large Monitor:** Maximize on 1440px+ display (XLarge)
+
+### Future Enhancements
+- [ ] Add debug overlay showing current breakpoint
+- [ ] Implement window maximize to overlay taskbar (platform-specific)
+- [ ] Add user preference for forcing mobile/desktop layout
+- [ ] Implement responsive grid layouts for dashboard widgets
+- [ ] Add orientation detection for tablets (portrait/landscape)
+
 ---
 
-**Last Updated:** 2025-11-20
+**Last Updated:** 2025-11-21
 **Rust Version:** 1.86+
 **egui Version:** 0.24
-**Platform:** Raspberry Pi 4B + 3.5" Touchscreen (480x320)
+**Platform:** Multi-platform (Raspberry Pi, Windows, macOS)
+**Primary Target:** Raspberry Pi 4B + 3.5" Touchscreen (480x320)

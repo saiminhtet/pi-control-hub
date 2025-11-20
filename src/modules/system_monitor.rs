@@ -14,9 +14,18 @@ impl SystemMonitor {
     
     fn get_usage_color(&self, usage: f32) -> Color32 {
         match usage {
-            x if x > 80.0 => Color32::RED,
-            x if x > 60.0 => Color32::YELLOW,
-            _ => Color32::GREEN,
+            // Use darker, more saturated colors for better contrast with white text
+            x if x > 80.0 => Color32::from_rgb(220, 38, 38),   // Red-600 - good contrast
+            x if x > 60.0 => Color32::from_rgb(202, 138, 4),   // Yellow-600 - darker yellow
+            _ => Color32::from_rgb(22, 163, 74),               // Green-600 - good contrast
+        }
+    }
+
+    fn get_temp_color(&self, temp: f32) -> Color32 {
+        match temp {
+            t if t > 70.0 => Color32::from_rgb(220, 38, 38),   // Red-600
+            t if t > 60.0 => Color32::from_rgb(202, 138, 4),   // Yellow-600
+            _ => Color32::from_rgb(22, 163, 74),               // Green-600
         }
     }
 }
@@ -52,9 +61,9 @@ impl super::Module for SystemMonitor {
         ui.add(
             ProgressBar::new(memory_percent)
                 .text(format!(
-                    "{:.1} MB / {:.1} MB ({:.1}%)",
-                    used_memory / 1024.0,
-                    total_memory / 1024.0,
+                    "{:.2} GB / {:.2} GB ({:.1}%)",
+                    used_memory / 1073741824.0,  // Convert bytes to GB (1024^3)
+                    total_memory / 1073741824.0,
                     memory_percent * 100.0
                 ))
                 .fill(self.get_usage_color(memory_percent * 100.0))
@@ -66,13 +75,7 @@ impl super::Module for SystemMonitor {
         if let Some(component) = self.system.components().first() {
             ui.heading("Temperature");
             let temp = component.temperature();
-            let temp_color = match temp {
-                t if t > 70.0 => Color32::RED,
-                t if t > 60.0 => Color32::YELLOW,
-                _ => Color32::GREEN,
-            };
-            
-            ui.colored_label(temp_color, format!("{:.1}°C", temp));
+            ui.colored_label(self.get_temp_color(temp), format!("{:.1}°C", temp));
         }
     }
 }

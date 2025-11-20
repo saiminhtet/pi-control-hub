@@ -1,5 +1,8 @@
 mod touch_design;
+mod responsive;
+
 pub use touch_design::TouchDesignSystem;
+pub use responsive::ResponsiveState;
 
 use egui::{Context, Color32};
 use crate::modules::{Module, ModuleType, system_monitor::SystemMonitor};
@@ -10,6 +13,7 @@ pub struct PiControlApp {
     pub design: TouchDesignSystem,
     pub system_info: SystemInfo,
     pub frame_count: u64,
+    pub responsive: ResponsiveState,
 }
 
 #[derive(Default)]
@@ -26,17 +30,22 @@ impl PiControlApp {
         cc.egui_ctx.style_mut(|style| {
             design.apply_to_style(style);
         });
-        
+
         // Initialize modules
         let mut modules = std::collections::HashMap::new();
         modules.insert(ModuleType::SystemMonitor, Box::new(SystemMonitor::new()) as Box<dyn Module>);
-        
+
+        // Initialize responsive state with default window size
+        let initial_size = cc.egui_ctx.screen_rect().size();
+        let responsive = ResponsiveState::new(initial_size);
+
         Self {
             current_module: ModuleType::Dashboard,
             modules,
             design,
             system_info: SystemInfo::default(),
             frame_count: 0,
+            responsive,
         }
     }
     
@@ -45,10 +54,31 @@ impl PiControlApp {
         // For now, use mock data
         use std::time::{SystemTime, UNIX_EPOCH};
         let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        
+
         self.system_info.cpu_usage = 25.0 + (time % 50) as f32; // Oscillate for demo
         self.system_info.memory_usage = 65.0;
         self.system_info.temperature = 45.0;
+    }
+
+    fn apply_responsive_styles(&mut self, ctx: &Context) {
+        let layout = &self.responsive.layout;
+
+        ctx.style_mut(|style| {
+            // Adjust button padding based on screen size
+            style.spacing.button_padding = egui::vec2(
+                layout.margins * 1.5,
+                layout.margins,
+            );
+
+            // Adjust item spacing
+            style.spacing.item_spacing = egui::vec2(layout.margins, layout.margins);
+
+            // Adjust window margins
+            style.spacing.window_margin = egui::Margin::same(layout.margins);
+
+            // Apply responsive font scaling
+            self.design.apply_responsive_fonts(style, layout.font_scale);
+        });
     }
     
     // TOUCH-OPTIMIZED COMPONENTS
@@ -66,43 +96,6 @@ impl PiControlApp {
                 .min_size(self.design.touch_targets.min_icon_size)
                 .frame(false)
         )
-    }
-    
-    pub fn navigation_panel(&mut self, ui: &mut egui::Ui) {
-        // Add scrollable area for navigation buttons
-        // Touch-optimized: always show scroll bar and use smooth scrolling
-        egui::ScrollArea::vertical()
-            .id_source("nav_scroll")
-            .auto_shrink([false; 2])
-            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
-            .drag_to_scroll(true) // Enable touch drag scrolling
-            .show(ui, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(8.0);
-
-                    for module_type in ModuleType::iter() {
-                        let is_active = self.current_module == module_type;
-                        let button_color = if is_active {
-                            self.design.colors.primary
-                        } else {
-                            self.design.colors.surface
-                        };
-
-                        let button = egui::Button::new(module_type.name())
-                            .min_size(egui::vec2(72.0, self.design.touch_targets.min_button_size.y))
-                            .fill(button_color);
-
-                        if ui.add(button).clicked() {
-                            self.current_module = module_type;
-                        }
-
-                        ui.add_space(4.0);
-                    }
-
-                    // Add extra space at bottom for better scrolling
-                    ui.add_space(8.0);
-                });
-            });
     }
     
     pub fn header_panel(&mut self, ui: &mut egui::Ui) {
@@ -136,61 +129,200 @@ impl PiControlApp {
     
     fn get_usage_color(&self, usage: f32) -> Color32 {
         match usage {
-            x if x > 80.0 => self.design.colors.error,
-            x if x > 60.0 => self.design.colors.warning,
-            _ => self.design.colors.success,
+            // Use darker shades for better contrast with white text on progress bars
+            x if x > 80.0 => Color32::from_rgb(220, 38, 38),   // Red-600
+            x if x > 60.0 => Color32::from_rgb(202, 138, 4),   // Yellow-600 (darker for contrast)
+            _ => Color32::from_rgb(22, 163, 74),               // Green-600
         }
     }
-    
+
     fn get_temperature_color(&self, temp: f32) -> Color32 {
         match temp {
-            x if x > 70.0 => self.design.colors.error,
-            x if x > 60.0 => self.design.colors.warning,
-            _ => self.design.colors.success,
+            x if x > 70.0 => Color32::from_rgb(220, 38, 38),   // Red-600
+            x if x > 60.0 => Color32::from_rgb(202, 138, 4),   // Yellow-600
+            _ => Color32::from_rgb(22, 163, 74),               // Green-600
+        }
+    }
+
+    // RESPONSIVE LAYOUTS
+
+    fn mobile_layout(&mut self, ctx: &Context) {
+        let header_height = self.responsive.layout.header_height;
+        let bottom_nav_height = self.responsive.layout.bottom_nav_height;
+
+        // TOP PANEL - Header with system status
+        egui::TopBottomPanel::top("header")
+            .exact_height(header_height)
+            .show(ctx, |ui| {
+                self.header_panel(ui);
+            });
+
+        // BOTTOM PANEL - Navigation (Mobile style)
+        egui::TopBottomPanel::bottom("bottom_nav")
+            .exact_height(bottom_nav_height)
+            .show(ctx, |ui| {
+                self.bottom_navigation(ui);
+            });
+
+        // MAIN CONTENT AREA
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.render_current_module(ctx, ui);
+        });
+    }
+
+    fn desktop_layout(&mut self, ctx: &Context) {
+        let header_height = self.responsive.layout.header_height;
+        let nav_panel_width = self.responsive.layout.nav_panel_width;
+
+        // TOP PANEL - Header with system status
+        egui::TopBottomPanel::top("header")
+            .exact_height(header_height)
+            .show(ctx, |ui| {
+                self.header_panel(ui);
+            });
+
+        // LEFT PANEL - Side Navigation (Desktop style)
+        egui::SidePanel::left("navigation")
+            .resizable(false)
+            .exact_width(nav_panel_width)
+            .show(ctx, |ui| {
+                self.side_navigation(ui);
+            });
+
+        // MAIN CONTENT AREA
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.render_current_module(ctx, ui);
+        });
+    }
+
+    fn render_current_module(&mut self, ctx: &Context, ui: &mut egui::Ui) {
+        match self.current_module {
+            ModuleType::Dashboard => {
+                self.dashboard_view(ui);
+            }
+            ModuleType::SystemMonitor => {
+                if let Some(module) = self.modules.get_mut(&ModuleType::SystemMonitor) {
+                    module.show(ctx, ui);
+                }
+            }
+            _ => {
+                self.placeholder_view(ui, self.current_module.name());
+            }
+        }
+    }
+
+    fn bottom_navigation(&mut self, ui: &mut egui::Ui) {
+        let nav_button_width = self.responsive.layout.nav_button_width;
+        let nav_button_height = self.responsive.layout.nav_button_height;
+        let current_module = self.current_module;
+        let primary_color = self.design.colors.primary;
+        let surface_color = self.design.colors.surface;
+
+        ui.horizontal(|ui| {
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                // Create scrollable horizontal navigation for mobile
+                egui::ScrollArea::horizontal()
+                    .id_source("bottom_nav_scroll")
+                    .auto_shrink([false; 2])
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            for module_type in ModuleType::iter() {
+                                let is_active = current_module == module_type;
+                                let button_color = if is_active {
+                                    primary_color
+                                } else {
+                                    surface_color
+                                };
+
+                                let button = egui::Button::new(self.get_module_icon(module_type))
+                                    .min_size(egui::vec2(nav_button_width, nav_button_height - 10.0))
+                                    .fill(button_color);
+
+                                if ui.add(button).clicked() {
+                                    self.current_module = module_type;
+                                }
+
+                                ui.add_space(4.0);
+                            }
+                        });
+                    });
+            });
+        });
+    }
+
+    fn side_navigation(&mut self, ui: &mut egui::Ui) {
+        let layout = &self.responsive.layout;
+
+        // Add scrollable area for navigation buttons
+        egui::ScrollArea::vertical()
+            .id_source("nav_scroll")
+            .auto_shrink([false; 2])
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+            .drag_to_scroll(true)
+            .show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(8.0);
+
+                    for module_type in ModuleType::iter() {
+                        let is_active = self.current_module == module_type;
+                        let button_color = if is_active {
+                            self.design.colors.primary
+                        } else {
+                            self.design.colors.surface
+                        };
+
+                        let button = egui::Button::new(module_type.name())
+                            .min_size(egui::vec2(
+                                layout.nav_button_width - 20.0,
+                                layout.nav_button_height,
+                            ))
+                            .fill(button_color);
+
+                        if ui.add(button).clicked() {
+                            self.current_module = module_type;
+                        }
+
+                        ui.add_space(4.0);
+                    }
+
+                    ui.add_space(8.0);
+                });
+            });
+    }
+
+    fn get_module_icon(&self, module_type: ModuleType) -> &'static str {
+        match module_type {
+            ModuleType::Dashboard => "🏠",
+            ModuleType::SystemMonitor => "📊",
+            ModuleType::MediaCenter => "🎵",
+            ModuleType::HomeAutomation => "🏡",
+            ModuleType::Gaming => "🎮",
+            ModuleType::Security => "🔒",
+            ModuleType::Settings => "⚙️",
         }
     }
 }
 
 impl eframe::App for PiControlApp {
-    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
+        // Update responsive state
+        self.responsive.update(ctx);
+
         // Update system info once per second (not every frame)
         if self.frame_count % 60 == 0 {
             self.update_system_info();
         }
         self.frame_count += 1;
-        
-        // TOP PANEL - Header with system status
-        egui::TopBottomPanel::top("header")
-            .exact_height(40.0) // Fixed height for touch
-            .show(ctx, |ui| {
-                self.header_panel(ui);
-            });
-        
-        // LEFT PANEL - Navigation
-        egui::SidePanel::left("navigation")
-            .resizable(false)
-            .min_width(80.0)
-            .max_width(100.0)
-            .show(ctx, |ui| {
-                self.navigation_panel(ui);
-            });
-        
-        // MAIN CONTENT AREA
-        egui::CentralPanel::default().show(ctx, |ui| {
-            match self.current_module {
-                ModuleType::Dashboard => {
-                    self.dashboard_view(ui);
-                }
-                ModuleType::SystemMonitor => {
-                    if let Some(module) = self.modules.get_mut(&ModuleType::SystemMonitor) {
-                        module.show(ctx, ui);
-                    }
-                }
-                _ => {
-                    self.placeholder_view(ui, self.current_module.name());
-                }
-            }
-        });
+
+        // Apply responsive styling
+        self.apply_responsive_styles(ctx);
+
+        // Use appropriate layout based on screen size
+        if self.responsive.is_mobile() {
+            self.mobile_layout(ctx);
+        } else {
+            self.desktop_layout(ctx);
+        }
     }
 }
 
