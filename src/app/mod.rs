@@ -69,28 +69,40 @@ impl PiControlApp {
     }
     
     pub fn navigation_panel(&mut self, ui: &mut egui::Ui) {
-        ui.vertical_centered(|ui| {
-            ui.add_space(8.0);
-            
-            for module_type in ModuleType::iter() {
-                let is_active = self.current_module == module_type;
-                let button_color = if is_active { 
-                    self.design.colors.primary 
-                } else { 
-                    self.design.colors.surface 
-                };
-                
-                let button = egui::Button::new(module_type.name())
-                    .min_size(egui::vec2(72.0, self.design.touch_targets.min_button_size.y))
-                    .fill(button_color);
-                
-                if ui.add(button).clicked() {
-                    self.current_module = module_type;
-                }
-                
-                ui.add_space(4.0);
-            }
-        });
+        // Add scrollable area for navigation buttons
+        // Touch-optimized: always show scroll bar and use smooth scrolling
+        egui::ScrollArea::vertical()
+            .id_source("nav_scroll")
+            .auto_shrink([false; 2])
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+            .drag_to_scroll(true) // Enable touch drag scrolling
+            .show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(8.0);
+
+                    for module_type in ModuleType::iter() {
+                        let is_active = self.current_module == module_type;
+                        let button_color = if is_active {
+                            self.design.colors.primary
+                        } else {
+                            self.design.colors.surface
+                        };
+
+                        let button = egui::Button::new(module_type.name())
+                            .min_size(egui::vec2(72.0, self.design.touch_targets.min_button_size.y))
+                            .fill(button_color);
+
+                        if ui.add(button).clicked() {
+                            self.current_module = module_type;
+                        }
+
+                        ui.add_space(4.0);
+                    }
+
+                    // Add extra space at bottom for better scrolling
+                    ui.add_space(8.0);
+                });
+            });
     }
     
     pub fn header_panel(&mut self, ui: &mut egui::Ui) {
