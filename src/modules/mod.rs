@@ -1,7 +1,8 @@
 pub mod system_monitor;
 pub mod media_center;
-pub mod home_automation;
-pub mod settings;
+// TODO: Implement these modules
+// pub mod home_automation;
+// pub mod settings;
 
 use egui::Context;
 

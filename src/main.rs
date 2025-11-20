@@ -3,14 +3,18 @@ use app::PiControlApp;
 
 mod app;
 mod modules;
-mod hardware;
-mod utils;
+// TODO: Implement these modules
+// mod hardware;
+// mod utils;
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(480.0, 320.0)),
-        resizable: false,
-        vsync: true,
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([480.0, 320.0])  // 3.5" screen size
+            .with_resizable(false)             // Fixed size for touch optimization
+            .with_decorations(true),
+        vsync: true,                           // Smooth rendering
+        centered: true,                        // Center on screen
         ..Default::default()
     };
 
@@ -18,7 +22,6 @@ fn main() -> Result<(), eframe::Error> {
         "Pi Control Hub",
         options,
         Box::new(|cc| {
-            egui_extras::install_image_loaders(&cc.egui_ctx);
             Box::new(PiControlApp::new(cc))
         }),
     )
