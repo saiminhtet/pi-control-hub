@@ -54,9 +54,9 @@ impl LayoutConfig {
                 margins: 8.0,
                 touch_size: 44.0,
                 font_scale: 1.5,
-                nav_button_width: 80.0,
-                nav_button_height: 60.0,
-                bottom_nav_height: 70.0,
+                nav_button_width: 60.0,  // Smaller for Pi screen (480px / 7 modules ≈ 68px)
+                nav_button_height: 56.0,
+                bottom_nav_height: 64.0, // Adjusted to fit buttons properly
             },
             ScreenSize::Small => Self {
                 nav_panel_width: 0.0,  // No side panel

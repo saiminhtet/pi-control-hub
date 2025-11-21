@@ -218,36 +218,34 @@ impl PiControlApp {
         let primary_color = self.design.colors.primary;
         let surface_color = self.design.colors.surface;
 
-        ui.horizontal(|ui| {
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                // Create scrollable horizontal navigation for mobile
-                egui::ScrollArea::horizontal()
-                    .id_source("bottom_nav_scroll")
-                    .auto_shrink([false; 2])
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            for module_type in ModuleType::iter() {
-                                let is_active = current_module == module_type;
-                                let button_color = if is_active {
-                                    primary_color
-                                } else {
-                                    surface_color
-                                };
+        // Create scrollable horizontal navigation for mobile
+        egui::ScrollArea::horizontal()
+            .id_source("bottom_nav_scroll")
+            .auto_shrink([false; 2])
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
+            .drag_to_scroll(true)  // Enable touch scrolling
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 2.0; // Tighter spacing for mobile
 
-                                let button = egui::Button::new(self.get_module_icon(module_type))
-                                    .min_size(egui::vec2(nav_button_width, nav_button_height - 10.0))
-                                    .fill(button_color);
+                    for module_type in ModuleType::iter() {
+                        let is_active = current_module == module_type;
+                        let button_color = if is_active {
+                            primary_color
+                        } else {
+                            surface_color
+                        };
 
-                                if ui.add(button).clicked() {
-                                    self.current_module = module_type;
-                                }
+                        let button = egui::Button::new(self.get_module_icon(module_type))
+                            .min_size(egui::vec2(nav_button_width, nav_button_height))
+                            .fill(button_color);
 
-                                ui.add_space(4.0);
-                            }
-                        });
-                    });
+                        if ui.add(button).clicked() {
+                            self.current_module = module_type;
+                        }
+                    }
+                });
             });
-        });
     }
 
     fn side_navigation(&mut self, ui: &mut egui::Ui) {
